@@ -2,6 +2,8 @@ package com.artemis;
 
 import com.artemis.utils.Bag;
 
+import java.util.BitSet;
+
 /**
  * Provide high performance component access and mutation from within a System.
  *
@@ -19,6 +21,7 @@ public final class ComponentMapper<A extends Component> extends BaseComponentMap
 	private final EntityTransmuter createTransmuter;
 	private final EntityTransmuter removeTransmuter;
 	private final ComponentPool pool;
+	private final Purgatory<A> purgatory;
 
 
 	public ComponentMapper(Class<A> type, World world) {
@@ -28,6 +31,8 @@ public final class ComponentMapper<A extends Component> extends BaseComponentMap
 		pool = (this.type.isPooled)
 			? new ComponentPool(type)
 			: null;
+
+		purgatory = new Purgatory<A>(world.batchProcessor, pool, components);
 
 		createTransmuter = new EntityTransmuterFactory(world).add(type).build();
 		removeTransmuter = new EntityTransmuterFactory(world).remove(type).build();
@@ -74,7 +79,7 @@ public final class ComponentMapper<A extends Component> extends BaseComponentMap
 	 */
 	@Override
 	public boolean has(int entityId) {
-		return get(entityId) != null;
+		return get(entityId) != null && !purgatory.idBits.get(entityId);
 	}
 
 
@@ -88,25 +93,16 @@ public final class ComponentMapper<A extends Component> extends BaseComponentMap
 	public void remove(int entityId) {
 		A component = get(entityId);
 		if (component != null) {
-			// running transmuter first, as it performs some validation
 			removeTransmuter.transmuteNoOperation(entityId);
-			components.fastSet(entityId, null);
-
-			if (pool != null)
-				pool.free((PooledComponent) component);
+			purgatory.mark(entityId);
 		}
 	}
 
 	@Override
 	protected void internalRemove(int entityId) { // triggers no composition id update
-		if (pool != null) {
-			A component = get(entityId);
-			if (component != null) {
-				pool.free((PooledComponent) component);
-			}
-		}
-
-		components.fastSet(entityId, null);
+		A component = get(entityId);
+		if (component != null)
+			purgatory.mark(entityId);
 	}
 
 	/**
@@ -141,9 +137,52 @@ public final class ComponentMapper<A extends Component> extends BaseComponentMap
 	}
 
 	private A createNew() {
-		return (pool != null)
-			? (A) pool.obtain()
-			: (A) ComponentManager.newInstance(type.getType());
+		return (A) ((pool != null)
+			? pool.obtain()
+			: ComponentManager.newInstance(type.getType()));
 	}
 
+	static class Purgatory<A extends Component> {
+		final BitSet idBits = new BitSet();
+		final ComponentPool pool;
+		final Bag<A> components;
+		final BatchChangeProcessor batchProcessor;
+
+		Purgatory(BatchChangeProcessor batchProcessor, ComponentPool pool, Bag<A> components) {
+			this.batchProcessor = batchProcessor;
+			this.pool = pool;
+			this.components = components;
+		}
+
+		void mark(int entityId) {
+			if (idBits.isEmpty()) // see cm#clean
+				batchProcessor.purgatories.add(this);
+
+			idBits.set(entityId);
+		}
+
+		void purge() {
+			if (pool != null)
+				purgeWithPool();
+			else
+				purgeNoPool();
+
+			idBits.clear();
+		}
+
+		private void purgeWithPool() {
+			for (int id = idBits.nextSetBit(0); id >= 0; id = idBits.nextSetBit(id + 1)) {
+				A c = components.get(id);
+					pool.free((PooledComponent) c);
+
+				components.fastSet(id, null);
+			}
+		}
+
+		private void purgeNoPool() {
+			for (int id = idBits.nextSetBit(0); id >= 0; id = idBits.nextSetBit(id + 1)) {
+				components.fastSet(id, null);
+			}
+		}
+	}
 }

@@ -400,6 +400,8 @@ public class World {
 		if (!pendingPurge.isEmpty()) {
 			cm.clean(pendingPurge);
 			em.clean(pendingPurge);
+
+			batchProcessor.purgeComponents();
 		}
 	}
 

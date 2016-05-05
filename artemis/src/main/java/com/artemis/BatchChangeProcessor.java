@@ -1,5 +1,6 @@
 package com.artemis;
 
+import com.artemis.ComponentMapper.Purgatory;
 import com.artemis.utils.Bag;
 import com.artemis.utils.ConverterUtil;
 import com.artemis.utils.IntBag;
@@ -11,9 +12,13 @@ final class BatchChangeProcessor {
 	private final AspectSubscriptionManager asm;
 
 	final BitSet changed = new BitSet();
+	final WildBag<Purgatory> purgatories = new WildBag<Purgatory>(Purgatory.class);
+
 	private final BitSet deleted = new BitSet();
 	private final BitSet pendingPurge = new BitSet();
 	private final IntBag toPurge = new IntBag();
+
+
 
 	private final Bag<EntityEdit> pool = new Bag<EntityEdit>();
 	private final WildBag<EntityEdit> edited = new WildBag(EntityEdit.class);
@@ -21,6 +26,7 @@ final class BatchChangeProcessor {
 	BatchChangeProcessor(World world) {
 		this.world = world;
 		asm = world.getAspectSubscriptionManager();
+
 	}
 
 	boolean isDeleted(int entityId) {
@@ -64,9 +70,17 @@ final class BatchChangeProcessor {
 	void update() {
 		while(!changed.isEmpty() || !deleted.isEmpty()) {
 			asm.process(changed, deleted);
+			purgeComponents();
 		}
 
 		clean();
+	}
+
+	void purgeComponents() {
+		for (int i = 0, s = purgatories.size(); s > i; i++)
+			purgatories.get(i).purge();
+
+		purgatories.setSize(0);
 	}
 
 	IntBag getPendingPurge() {

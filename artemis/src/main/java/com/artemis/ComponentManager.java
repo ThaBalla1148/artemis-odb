@@ -2,6 +2,7 @@ package com.artemis;
 
 import java.util.BitSet;
 
+import com.artemis.ComponentMapper.Purgatory;
 import com.artemis.annotations.SkipWire;
 import com.artemis.utils.Bag;
 import com.artemis.utils.ImmutableBag;
@@ -236,7 +237,6 @@ public class ComponentManager extends BaseSystem {
 			mapper.components.ensureCapacity(newSize);
 		}
 	}
-
 
 	/** Tracks all unique component compositions. */
 	static final class ComponentIdentityResolver {
