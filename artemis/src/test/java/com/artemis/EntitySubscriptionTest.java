@@ -101,6 +101,41 @@ public class EntitySubscriptionTest {
 	}
 
 	@Test
+	public void removed_component_not_retained_in_remove() {
+		World world = new World();
+
+		final ComponentMapper<ComponentY> mapper = world.getMapper(ComponentY.class);
+
+		world.getAspectSubscriptionManager()
+			.get(all(ComponentY.class))
+			.addSubscriptionListener(new EntitySubscription.SubscriptionListener() {
+				@Override
+				public void inserted(IntBag entities) {
+					assertEquals(1, entities.size());
+				}
+
+				@Override
+				public void removed(IntBag entities) {
+					assertEquals(1, entities.size());
+					assertNull(mapper.get(entities.get(0)));
+				}
+			});
+
+		int id1 = world.create();
+		world.edit(id1).create(ComponentY.class);
+
+		world.process();
+		world.edit(id1).remove(ComponentY.class);
+		world.process();
+
+		world.edit(id1).create(ComponentY.class);
+
+		world.process();
+		world.edit(id1).remove(ComponentY.class);
+		world.process();
+	}
+
+	@Test
 	public void manager_entity_subscription_test() {
 		SubscribingManager sm = new SubscribingManager();
 		World world = new World(new WorldConfiguration()
