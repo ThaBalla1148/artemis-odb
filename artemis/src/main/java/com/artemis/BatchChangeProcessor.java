@@ -1,6 +1,5 @@
 package com.artemis;
 
-import com.artemis.ComponentMapper.Purgatory;
 import com.artemis.utils.Bag;
 import com.artemis.utils.ConverterUtil;
 import com.artemis.utils.IntBag;
@@ -17,8 +16,6 @@ final class BatchChangeProcessor {
 	private final BitSet deleted = new BitSet();
 	private final BitSet pendingPurge = new BitSet();
 	private final IntBag toPurge = new IntBag();
-
-
 
 	private final Bag<EntityEdit> pool = new Bag<EntityEdit>();
 	private final WildBag<EntityEdit> edited = new WildBag(EntityEdit.class);

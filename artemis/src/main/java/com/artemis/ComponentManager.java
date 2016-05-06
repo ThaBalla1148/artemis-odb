@@ -2,7 +2,6 @@ package com.artemis;
 
 import java.util.BitSet;
 
-import com.artemis.ComponentMapper.Purgatory;
 import com.artemis.annotations.SkipWire;
 import com.artemis.utils.Bag;
 import com.artemis.utils.ImmutableBag;
@@ -82,7 +81,7 @@ public class ComponentManager extends BaseSystem {
 	 * @param entityId
 	 *			the entity to remove components from
 	 */
-	private void removeComponents(int entityId) {
+	void removeComponents(int entityId) {
 		IntBag typeIds = componentTypeIds(entityId);
 		int[] ids = typeIds.getData();
 		for (int i = 0, s = typeIds.size(); s > i; i++) {
@@ -148,7 +147,7 @@ public class ComponentManager extends BaseSystem {
 	void clean(IntBag deletedIds) {
 		int[] ids = deletedIds.getData();
 		for(int i = 0, s = deletedIds.size(); s > i; i++) {
-			removeComponents(ids[i]);
+//			removeComponents(ids[i]);
 			entityToIdentity.set(ids[i], (short)0);
 		}
 	}

@@ -266,6 +266,7 @@ public class World {
 	 */
 	public void delete(int entityId) {
 		batchProcessor.delete(entityId);
+		cm.removeComponents(entityId);
 	}
 
 	/**

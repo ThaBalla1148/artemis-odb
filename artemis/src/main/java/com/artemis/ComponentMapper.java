@@ -1,8 +1,10 @@
 package com.artemis;
 
+import com.artemis.annotations.DelayedComponentDeletion;
 import com.artemis.utils.Bag;
+import com.artemis.utils.reflect.ClassReflection;
 
-import java.util.BitSet;
+import static com.artemis.utils.reflect.ClassReflection.isAnnotationPresent;
 
 /**
  * Provide high performance component access and mutation from within a System.
@@ -32,7 +34,10 @@ public final class ComponentMapper<A extends Component> extends BaseComponentMap
 			? new ComponentPool(type)
 			: null;
 
-		purgatory = new Purgatory<A>(world.batchProcessor, pool, components);
+		if (isAnnotationPresent(type, DelayedComponentDeletion.class))
+			purgatory = new DelayedPurgatory<A>(components, pool, world.batchProcessor);
+		else
+			purgatory = new ImmediatePurgatory<A>(components, pool);
 
 		createTransmuter = new EntityTransmuterFactory(world).add(type).build();
 		removeTransmuter = new EntityTransmuterFactory(world).remove(type).build();
@@ -79,7 +84,7 @@ public final class ComponentMapper<A extends Component> extends BaseComponentMap
 	 */
 	@Override
 	public boolean has(int entityId) {
-		return get(entityId) != null && !purgatory.idBits.get(entityId);
+		return get(entityId) != null && !purgatory.has(entityId);
 	}
 
 
@@ -142,47 +147,4 @@ public final class ComponentMapper<A extends Component> extends BaseComponentMap
 			: ComponentManager.newInstance(type.getType()));
 	}
 
-	static class Purgatory<A extends Component> {
-		final BitSet idBits = new BitSet();
-		final ComponentPool pool;
-		final Bag<A> components;
-		final BatchChangeProcessor batchProcessor;
-
-		Purgatory(BatchChangeProcessor batchProcessor, ComponentPool pool, Bag<A> components) {
-			this.batchProcessor = batchProcessor;
-			this.pool = pool;
-			this.components = components;
-		}
-
-		void mark(int entityId) {
-			if (idBits.isEmpty()) // see cm#clean
-				batchProcessor.purgatories.add(this);
-
-			idBits.set(entityId);
-		}
-
-		void purge() {
-			if (pool != null)
-				purgeWithPool();
-			else
-				purgeNoPool();
-
-			idBits.clear();
-		}
-
-		private void purgeWithPool() {
-			for (int id = idBits.nextSetBit(0); id >= 0; id = idBits.nextSetBit(id + 1)) {
-				A c = components.get(id);
-					pool.free((PooledComponent) c);
-
-				components.fastSet(id, null);
-			}
-		}
-
-		private void purgeNoPool() {
-			for (int id = idBits.nextSetBit(0); id >= 0; id = idBits.nextSetBit(id + 1)) {
-				components.fastSet(id, null);
-			}
-		}
-	}
 }
